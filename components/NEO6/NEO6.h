@@ -11,8 +11,18 @@ extern "C" {
 #include "esp_err.h"
 #include "driver/uart.h"
 
+#define UART_NUM UART_NUM_1             // Use UART1 for NEO-6M
+#define BAUD_RATE 9600                  // Matches NEO-6M default
+#define DATA_BITS UART_DATA_8_BITS      // 8 data bits for 8N1
+#define UART_PARITY UART_PARITY_DISABLE // No parity for 8N1
+#define UART_STOP_BITS UART_STOP_BITS_1 // 1 stop bit for 8N1
+#define UART_HW_FLOWCTRL UART_HW_FLOWCTRL_DISABLE // No flow control
+#define FLOW_CTRL_THRESH 0              // Irrelevant with flow control disabled
+#define TX_PIN 14  // Adjust based on your ESP32-CAM schematic
+#define RX_PIN 15  // Adjust based on your ESP32-CAM schematic
+#define RX_BUFFER_SIZE 256
 
-// init params
+
 
 // Context: This structure will be populated with settings specific to your NEO-6M, 
 // which uses 9600 baud, 8 data bits, no parity, and 1 stop bit.
@@ -20,9 +30,7 @@ extern "C" {
 
 //function prototypes
 
-void uart_init(handle *uarthandle);
-
-
+void uart_init(uart_port_t uart_num); 
 
 
 #ifdef __cplusplus
