@@ -4,13 +4,15 @@
 #include "driver/uart.h"
 #include "NEO6.h"
 
-
-
-
-
+#define GPS_TASK_STACK_SIZE (4096)  // Increased stack size
+#define GPS_TASK_PRIORITY    (5)    // Medium priority
 
 
 static const char *TAG = "MAIN APP-NEO6";   // tag for main code 
+
+
+
+
 
 
 void app_main(void){
@@ -24,22 +26,12 @@ void app_main(void){
     printf("                         ░█▓█░                          \n");
     printf("                         ▓█▒░▒█▒                         \n");
     printf("                       ░▓█▒░░░▒█▒                        \n");
-    printf("                      ░██░░░░░░▒█▓                       \n");
-    printf("                    ░██░░░░░░░░░░░░                    \n");
-    printf("                ▒█▒░░░░░░░▓████░▓▓▓░█░                \n");
-    printf("               ▒█▒░░░░░░░▒██░███░▒▒▓▒░░▒               \n");
-    printf("             ░▒█▒░░░░░░░▒██░░░███▓▓░░░░░▓▒              \n");
-    printf("         ░██░░░▒▓▓▓▒▒██▓░░░░░░░░▒███▒░░░░░█░         \n");
-    printf("        ░█▓░░░▒▓▓▓▓▒▓▓▓░▒▒▒▒▒▒▒▒▒▓▓██░░░░░░░▓░        \n");
-    printf("       ▒█▓░░░░▒▓▓▓▒▒▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒▓░░░░░░░░░       \n");
-    printf("      ░█▓░░░░░░▒▒▓▓▓▒▒░░░░░░░░░░░░░▒▒▓▓▓░░░░░░░░      \n");
-    printf("      ▒█▒░░░░░▓▓▒▒░░░░░░░░░░░░░░░░░░░░░▒▒▓▒░░░░░░      \n");
-    printf("      ░▓█▒░░░▒░░░██▒▒█▒█▓▒█▒▒██░▓█▒█▒█▓▒░░▒░░░░▒░░░█▒       \n");
-    printf("         ▒█▓░░░░█░░█░▒▒▓▒░▓▓▒▓░▓░▓░▓▒▓▓▒░░░░░░░░░░░░▒█▓░         \n");
-    printf("          ░██▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░░░░░░░░░░░▒▒▒▒▓░          \n");
-    printf("            ▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓░            \n");
-    printf("                                                          \n");
-    printf("      ✴       ✴ <<<MADMANINDUSTRIES>>> ✴     ✴          \n");
+    printf("                      ▒█▒█▓▒█▒▒██░                 \n");
+    printf("                       ▒█▓░░░░▓▓▓              \n");
+    printf("                        ░██▒▒▒▒▒                 \n");
+    printf("                          ▒▓░░░                 \n");
+    printf("                            ▒▒                               \n");
+    printf("      ✴       ✴ <<<MADMANINDUSTRIES>>> ✴     ✴           \n");
 
     // Entry POINT:
 
@@ -48,8 +40,15 @@ void app_main(void){
     uart_init(uart_num);
 
 
-    //while(1)
-    //vTask(free rtos call )
+    // Launch GPS task
+    xTaskCreate(
+        gps_task,              // Task function
+        "gps_task",           // Task name
+        GPS_TASK_STACK_SIZE,  // Stack size in words
+        (void*)UART_NUM,      // Parameters
+        GPS_TASK_PRIORITY,    // Priority
+        NULL                  // Task handle
+    );
     
 
 

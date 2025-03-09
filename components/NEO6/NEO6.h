@@ -21,7 +21,7 @@ extern "C" {
 #define TX_PIN 14  // Adjust based on your ESP32-CAM schematic
 #define RX_PIN 15  // Adjust based on your ESP32-CAM schematic
 #define RX_BUFFER_SIZE 256
-
+#define NMEA_SENTENCE_MAX_LENGTH 82  // Maximum length of NMEA sentence (including $ and \r\n)
 
 
 // Context: This structure will be populated with settings specific to your NEO-6M, 
@@ -31,6 +31,8 @@ extern "C" {
 //function prototypes
 
 void uart_init(uart_port_t uart_num); 
+void gps_event_handler(uint8_t *data, uint16_t len);
+void gps_task(uart_port_t uart_num);
 
 
 #ifdef __cplusplus
