@@ -23,9 +23,25 @@ files that provide set of directives and instructions describing the project's s
 
 Below is short explanation of remaining files in the project folder.
 
+## expected output:
+Status: Active
+UTC Time: 03:01:49.., Date: 14/03/1925
+Latitude: 33.426° N, Longitude: 111.952° W
+Speed: 7.38 knots, Course: 137.82°, Variation: °
 
-+++++++++++++++++++
-project directory:
+Status: Active
+UTC Time: 03:01:50.., Date: 14/03/1925
+Latitude: 33.426° N, Longitude: 111.952° W
+Speed: 5.76 knots, Course: 132.32°, Variation: °
+
+Status: Active
+UTC Time: 03:01:51.., Date: 14/03/1925
+Latitude: 33.426° N, Longitude: 111.952° W
+Speed: 4.34 knots, Course: 123.13°, Variation: °
+
+
+## project directory:
+
 
 NATURESCAN-NEO6/
             |──README.md                
@@ -40,7 +56,7 @@ NATURESCAN-NEO6/
                        |──CMakeLists.txt
                        |──NEO6.c
                        └──NEO6.h
-   +++++++++++++++++++                                
+                              
 
 
 
