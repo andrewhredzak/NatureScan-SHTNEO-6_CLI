@@ -43,6 +43,9 @@ void uart_init(uart_port_t uart_num) {
     ESP_LOGI(TAG, "UART driver installed.");
 }
 
+
+
+//will remove when process_nmea_sentence is implemented
 void gps_event_handler(uint8_t *data, uint16_t len) {
     // Null-terminate the data for safe printing
     if (len >= RX_BUFFER_SIZE) {
@@ -51,8 +54,89 @@ void gps_event_handler(uint8_t *data, uint16_t len) {
     data[len] = '\0';
 
     // Log the raw NMEA sentence to console (UART1)
-    ESP_LOGI(TAG, "GPS Data: %s", (char *)data);
+    //ESP_LOGI(TAG, "GPS Data: %s", (char *)data);
 }
+
+
+
+char uart_buffer[RX_BUFFER_SIZE];
+int buffer_pos = 0;
+
+
+
+
+
+void process_nmea_sentence(char *sentence) {
+    // Check if the sentence starts with $GPRMC
+    if (strncmp(sentence, "$GPRMC", 6) != 0) {
+        return; // Not a GPRMC sentence, skip
+    }
+
+    // Tokenize the sentence using comma as delimiter
+    char *fields[20]; // Array to hold pointers to fields
+    int field_count = 0;
+
+    fields[field_count++] = sentence; // First field starts at the beginning
+    for (char *p = sentence; *p != '\0'; p++) {
+        if (*p == ',') {
+            *p = '\0'; // Replace comma with null terminator
+            fields[field_count++] = p + 1; // Next field starts after the comma
+        }
+        if (*p == '*') break; // Stop at checksum
+    }
+
+    // Ensure we have the expected number of fields (at least 12 for GPRMC)
+    if (field_count < 12) {
+        printf("Incomplete GPRMC sentence\n");
+        return;
+    }
+
+    // Extract fields
+    char *time = fields[1];        // e.g., "123519.7"
+    char *status = fields[2];      // e.g., "A"
+    char *latitude = fields[3];    // e.g., "4807.038"
+    char *lat_dir = fields[4];     // e.g., "N"
+    char *longitude = fields[5];   // e.g., "01131.000"
+    char *lon_dir = fields[6];     // e.g., "E"
+    char *speed = fields[7];       // e.g., "622.4"
+    char *course = fields[8];      // e.g., "984.4"
+    char *date = fields[9];        // e.g., "230394"
+    char *variation = fields[10];  // e.g., "003.1"
+    char *var_dir = fields[11];    // e.g., "W"
+
+    // Convert latitude and longitude to degrees and minutes
+    float lat_deg = atoi(latitude) / 100;
+    float lat_min = (atof(latitude) - (int)lat_deg * 100);
+    lat_deg += lat_min / 60.0;
+
+    float lon_deg = atoi(longitude) / 100;
+    float lon_min = (atof(longitude) - (int)lon_deg * 100);
+    lon_deg += lon_min / 60.0;
+
+    // Format time and date
+    char time_str[11];
+    char date_str[12];
+    snprintf(time_str, sizeof(time_str), "%c%c:%c%c:%c%c.%c",
+             time[0], time[1], time[2], time[3], time[4], time[5], time[6]);
+    snprintf(date_str, sizeof(date_str), "%c%c/%c%c/%c%c%c%c",
+             date[0], date[1], date[2], date[3], '1', '9', date[4], date[5]);
+
+    // Print human-readable output
+    printf("Status: %s\nUTC Time: %s, Date: %s\nLatitude: %.3f° %s, Longitude: %.3f° %s\n"
+           "Speed: %s knots, Course: %s°, Variation: %s° %s\n",
+           status[0] == 'A' ? "Active" : "Void",time_str,date_str,  
+           lat_deg, lat_dir, lon_deg, lon_dir,
+           speed, course, variation, var_dir);
+    printf("\n");
+}
+
+
+
+
+
+
+
+
 
 void gps_task(uart_port_t uart_num) {
     uint8_t buffer[RX_BUFFER_SIZE];
@@ -63,7 +147,22 @@ void gps_task(uart_port_t uart_num) {
         int len = uart_read_bytes(uart_num, buffer, RX_BUFFER_SIZE - 1, pdMS_TO_TICKS(100));
         //ESP_LOGI(TAG, "len:%d", len);
         if (len > 0) {
-            // Check for UART read errors.
+            for (int i = 0; i < len; i++) {
+                uart_buffer[buffer_pos++] = buffer[i];
+
+                // Check for end of NMEA sentence (\r\n)
+                if (buffer_pos >= 2 && uart_buffer[buffer_pos - 2] == '\r' && uart_buffer[buffer_pos - 1] == '\n') {
+                    uart_buffer[buffer_pos] = '\0'; // Null-terminate the string
+                    process_nmea_sentence(uart_buffer);
+                    buffer_pos = 0; // Reset buffer position
+                    }
+            
+
+                // Prevent buffer overflow
+                if (buffer_pos >= RX_BUFFER_SIZE - 1) {
+                    buffer_pos = 0; // Reset on overflow
+                }
+            }
             if (len < 0){
                  ESP_LOGE(TAG, "UART read error: %d",len);
             } else {
