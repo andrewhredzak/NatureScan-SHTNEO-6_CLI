@@ -18,8 +18,8 @@ extern "C" {
 #define UART_STOP_BITS UART_STOP_BITS_1 // 1 stop bit for 8N1
 #define UART_HW_FLOWCTRL UART_HW_FLOWCTRL_DISABLE // No flow control
 #define FLOW_CTRL_THRESH 0              // Irrelevant with flow control disabled
-#define TX_PIN 14  // Adjust based on your ESP32-CAM schematic
-#define RX_PIN 15  // Adjust based on your ESP32-CAM schematic
+#define TX_PIN 12  // og  14    Adjust based on your ESP32-CAM schematic
+#define RX_PIN 13  // og  15   Adjust based on your ESP32-CAM schematic
 #define RX_BUFFER_SIZE 256
 #define NMEA_SENTENCE_MAX_LENGTH 82  // Maximum length of NMEA sentence (including $ and \r\n)
 
