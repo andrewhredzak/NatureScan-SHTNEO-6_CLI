@@ -70,6 +70,11 @@ esp_err_t SHT_READ(i2c_master_dev_handle_t dev_handle,float *temperature, float 
 
 
     vTaskDelay(pdMS_TO_TICKS(20)); // Allow time for the measurement to complete
+    // print raw values to see
+    // we want to send raw values as it will be quicker...
+    ESP_LOGI(TAG,"These are the raw_values: %02X %02X %02X %02X %02X %02X %02X", raw_values[0],
+         raw_values[1], raw_values[2], raw_values[3], raw_values[4], raw_values[5], raw_values[6]);
+
 
     // Convert raw values to temperature and humidity
     uint16_t raw_temp = (raw_values[0] << 8) | raw_values[1];

@@ -11,6 +11,25 @@
 #include "SHT31.h"  
 
 
+// unicast import
+#include <stdlib.h>
+#include <time.h>
+#include <string.h>
+#include <assert.h>
+#include "freertos/semphr.h"
+#include "freertos/timers.h"
+#include "nvs_flash.h"
+#include "esp_random.h"
+#include "esp_event.h"
+#include "esp_netif.h"
+#include "esp_wifi.h"
+#include "esp_mac.h"
+#include "esp_now.h"
+#include "esp_crc.h"
+#include "unicast.h"
+
+
+
 #define GPS_TASK_STACK_SIZE (4096)  // Increased stack size
 #define GPS_TASK_PRIORITY    (5)    // Medium priority
 #define SHT31_TASK_PRIORITY  (4)    // Medium priority
@@ -87,12 +106,21 @@ void app_main(void){
         ESP_LOGI(TAG, "I2C de-initialized successfully");
     }
 
+    // Initialize NVS
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK( nvs_flash_erase() );
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK( ret );
+
 
 
     // Entry POINT:
+    /*
 
 
-
+    // launch NEO-6 task
     if(err == ESP_OK) {
         ESP_LOGI(TAG, "SHT31 sensor found");
         //xTaskCreate(sht4x_read_task, "sht4x_read_task", 4096, NULL, 5, NULL);
@@ -109,8 +137,17 @@ void app_main(void){
         ESP_LOGI(TAG, "I2C de-initialized successfully");
     }
 
-    // Launch GPS task
+    // launch NEO-6 GPS task
     xTaskCreate(gps_task,"gps_task",GPS_TASK_STACK_SIZE,(void*)UART_NUM,GPS_TASK_PRIORITY,NULL);
+
+    */
+
+
+    // Initialize WiFi and ESPNOW
+    example_wifi_init();
+    example_espnow_init();
+    // launch unicast 
+    unicast_print_test();
     
 
 
