@@ -66,7 +66,18 @@ void app_main(void){
     printf("      ✴       ✴ <<<MADMANINDUSTRIES>>> ✴     ✴           \n");
 
     
+    // Initialize NVS
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK( nvs_flash_erase() );
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK( ret );
 
+    // Entry POINT:
+   
+
+    /*
 
     // sht init
     i2c_master_bus_handle_t bus_handle;
@@ -90,6 +101,8 @@ void app_main(void){
     // Probe the sensor to check if it is connected to the bus with a 10ms timeout
     esp_err_t err = i2c_master_probe(bus_handle, SHT31_I2C_ADDR_0X44, 200);
 
+
+    // SHT31 temp sensor task
     if(err == ESP_OK) {
         ESP_LOGI(TAG, "SHT31 sensor found");
         //xTaskCreate(sht4x_read_task, "sht4x_read_task", 4096, NULL, 5, NULL);
@@ -106,48 +119,20 @@ void app_main(void){
         ESP_LOGI(TAG, "I2C de-initialized successfully");
     }
 
-    // Initialize NVS
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK( nvs_flash_erase() );
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK( ret );
-
-
-
-    // Entry POINT:
-    /*
-
-
-    // launch NEO-6 task
-    if(err == ESP_OK) {
-        ESP_LOGI(TAG, "SHT31 sensor found");
-        //xTaskCreate(sht4x_read_task, "sht4x_read_task", 4096, NULL, 5, NULL);
-        if (xTaskCreate(SHT31TAKEDATA_task, "SHT31_TASK", 2048, (void*)params, 5, NULL) != pdPASS) {
-            ESP_LOGE("MAIN", "failed to create sht31 task");
-            free(params);
-    }
-
-    } else {
-        ESP_LOGE(TAG, "SHT31 sensor not found");
-        //sht4x_device_delete(sht4x_handle);
-        ESP_ERROR_CHECK(i2c_master_bus_rm_device(dev_handle));
-        ESP_ERROR_CHECK(i2c_del_master_bus(bus_handle));
-        ESP_LOGI(TAG, "I2C de-initialized successfully");
-    }
 
     // launch NEO-6 GPS task
     xTaskCreate(gps_task,"gps_task",GPS_TASK_STACK_SIZE,(void*)UART_NUM,GPS_TASK_PRIORITY,NULL);
 
     */
 
-
     // Initialize WiFi and ESPNOW
     example_wifi_init();
     example_espnow_init();
+
     // launch unicast 
     unicast_print_test();
+
+    //adding change 1
     
 
 
