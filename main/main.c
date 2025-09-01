@@ -66,8 +66,22 @@ void app_main(void){
     printf("      ✴       ✴ <<<MADMANINDUSTRIES>>> ✴     ✴           \n");
 
     
+    // Initialize NVS
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK( nvs_flash_erase() );
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK( ret );
 
 
+
+
+    // Entry POINT:
+
+    /*
+
+    
     // sht init
     i2c_master_bus_handle_t bus_handle;
     i2c_master_dev_handle_t dev_handle;
@@ -106,18 +120,11 @@ void app_main(void){
         ESP_LOGI(TAG, "I2C de-initialized successfully");
     }
 
-    // Initialize NVS
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK( nvs_flash_erase() );
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK( ret );
+    
 
 
-
-    // Entry POINT:
-    /*
+    
+    
 
 
     // launch NEO-6 task
@@ -149,7 +156,7 @@ void app_main(void){
     // launch unicast 
     unicast_print_test();
 
-    //adding change 1
+
     
 
 
