@@ -79,7 +79,7 @@ void app_main(void){
 
     // Entry POINT:
 
-    /*
+    
 
     
     // sht init
@@ -97,8 +97,6 @@ void app_main(void){
     params->humidity = &humidity;
 
 
-    const uart_port_t uart_num = UART_NUM;
-    uart_init(uart_num);
 
 
     // Probe the sensor to check if it is connected to the bus with a 10ms timeout
@@ -123,26 +121,13 @@ void app_main(void){
     
 
 
+    /*
     
-    
 
 
-    // launch NEO-6 task
-    if(err == ESP_OK) {
-        ESP_LOGI(TAG, "SHT31 sensor found");
-        //xTaskCreate(sht4x_read_task, "sht4x_read_task", 4096, NULL, 5, NULL);
-        if (xTaskCreate(SHT31TAKEDATA_task, "SHT31_TASK", 2048, (void*)params, 5, NULL) != pdPASS) {
-            ESP_LOGE("MAIN", "failed to create sht31 task");
-            free(params);
-    }
-
-    } else {
-        ESP_LOGE(TAG, "SHT31 sensor not found");
-        //sht4x_device_delete(sht4x_handle);
-        ESP_ERROR_CHECK(i2c_master_bus_rm_device(dev_handle));
-        ESP_ERROR_CHECK(i2c_del_master_bus(bus_handle));
-        ESP_LOGI(TAG, "I2C de-initialized successfully");
-    }
+    // UART initialization for NEO-6
+    const uart_port_t uart_num = UART_NUM;
+    uart_init(uart_num);
 
     // launch NEO-6 GPS task
     xTaskCreate(gps_task,"gps_task",GPS_TASK_STACK_SIZE,(void*)UART_NUM,GPS_TASK_PRIORITY,NULL);
