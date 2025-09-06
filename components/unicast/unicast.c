@@ -8,6 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/timers.h"
+#include "freertos/queue.h"
 #include "nvs_flash.h"
 #include "esp_random.h"
 #include "esp_event.h"
@@ -19,10 +20,48 @@
 #include "unicast.h"
 
 
-const char *TAG = "unicast modular template";
+const char *TAG = "unicast source file";
 uint8_t s_example_broadcast_mac[ESP_NOW_ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+uint8_t s_ADAM_peer_mac[ESP_NOW_ETH_ALEN] = { 0x94, 0x54, 0xC5, 0xB1, 0x02, 0x60 }; // 94:54:c5:b1:02:60
 uint16_t s_example_espnow_seq[EXAMPLE_ESPNOW_DATA_MAX] = { 0, 0 };
 QueueHandle_t s_example_espnow_queue;
+
+// ---- SHT31 -> ESPNOW bridge ----
+static QueueHandle_t s_sht_queue = NULL;
+static uint8_t s_sensor_payload[4] = {0};  // {T_hi, T_lo, H_hi, H_lo}
+
+static void sht_queue_task(void *arg) {
+    sht31_raw_sample_t s;
+    while (1) {
+        if (xQueueReceive(s_sht_queue, &s, portMAX_DELAY) == pdTRUE) {
+            s_sensor_payload[0] = s.t_hi;
+            s_sensor_payload[1] = s.t_lo;
+            s_sensor_payload[2] = s.h_hi;
+            s_sensor_payload[3] = s.h_lo;
+        }
+    }
+}
+
+esp_err_t unicast_sensor_queue_init(size_t depth) {
+    if (s_sht_queue) return ESP_OK;
+    s_sht_queue = xQueueCreate(depth, sizeof(sht31_raw_sample_t));
+    if (!s_sht_queue) {
+        ESP_LOGE(TAG, "Failed to create SHT31 sensor queue");
+        return ESP_FAIL;
+    }
+    if (xTaskCreate(sht_queue_task, "sht_queue_task", 2048, NULL, 4, NULL) != pdPASS) {
+        vQueueDelete(s_sht_queue);
+        s_sht_queue = NULL;
+        ESP_LOGE(TAG, "Failed to create sht_queue_task");
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
+bool unicast_sensor_queue_push(sht31_raw_sample_t sample) {
+    if (!s_sht_queue) return false;
+    return xQueueSend(s_sht_queue, &sample, 0) == pdTRUE;
+}
 
 
 void unicast_print_test() {
@@ -168,15 +207,17 @@ static void example_espnow_task(void *pvParameter)
     int ret;
 
     vTaskDelay(5000 / portTICK_PERIOD_MS);
-    ESP_LOGI(TAG, "Start sending broadcast data");
+    ESP_LOGI(TAG, "Start sending unicast data");
 
-    /* Start sending broadcast ESPNOW data. */
+    /* Start sending unicast ESPNOW data. */
     example_espnow_send_param_t *send_param = (example_espnow_send_param_t *)pvParameter;
+    ESP_LOG_BUFFER_HEX("line 213 before esp_now_send unicast:", send_param->buffer, send_param->len);
     if (esp_now_send(send_param->dest_mac, send_param->buffer, send_param->len) != ESP_OK) {
-        ESP_LOGE(TAG, "Send error");
+        ESP_LOGE(TAG, "Unicast Send error");
         example_espnow_deinit(send_param);
         vTaskDelete(NULL);
     }
+
 
     while (xQueueReceive(s_example_espnow_queue, &evt, portMAX_DELAY) == pdTRUE) {
         switch (evt.id) {
@@ -186,10 +227,6 @@ static void example_espnow_task(void *pvParameter)
                 is_broadcast = IS_BROADCAST_ADDR(send_cb->mac_addr);
 
                 ESP_LOGD(TAG, "Send data to "MACSTR", status1: %d", MAC2STR(send_cb->mac_addr), send_cb->status);
-
-                if (is_broadcast && (send_param->broadcast == false)) {
-                    break;
-                }
 
                 if (!is_broadcast) {
                     send_param->count--;
@@ -212,19 +249,24 @@ static void example_espnow_task(void *pvParameter)
                 else if (mode == WIFI_MODE_AP) mode_str = "AP";
                 else if (mode == WIFI_MODE_APSTA) mode_str = "AP+STA";
 
-                // Print the payload before transmission
-                if (send_param->payload && send_param->payload_len > 0) {
-                    printf("payload: %.*s\n", send_param->payload_len, (char *)send_param->payload);
-                }
+                
 
-                ESP_LOGI("Unicast Template-SERVER", "WiFi mode: %s, sending data to "MACSTR"", mode_str, MAC2STR(send_cb->mac_addr));
+                ESP_LOGI("CLI test", "WiFi mode: %s, sending data to "MACSTR"", mode_str, MAC2STR(send_cb->mac_addr));
 
                 memcpy(send_param->dest_mac, send_cb->mac_addr, ESP_NOW_ETH_ALEN);
                 example_espnow_data_prepare(send_param);
 
+                // Print the payload before transmission
+                if (send_param->payload && send_param->payload_len > 0) {
+                    //ESP_LOG_BUFFER_HEX("temp+humid payload:", send_param->payload, send_param->payload_len);
+                    //printf("payload: %.*s\n", send_param->payload_len, (char *)send_param->payload);
+                }
+
                 /* Send the next data after the previous data is sent. */
+                ESP_LOG_BUFFER_HEX("line 269 temp+humid payload:", send_param->payload, send_param->payload_len);
+                ESP_LOG_BUFFER_HEX("line 270 send_param->buffer:", send_param->buffer, send_param->len);
                 if (esp_now_send(send_param->dest_mac, send_param->buffer, send_param->len) != ESP_OK) {
-                    ESP_LOGE(TAG, "Send error");
+                    ESP_LOGE(TAG, "Unicast Send error 2");
                     example_espnow_deinit(send_param);
                     vTaskDelete(NULL);
                 }
@@ -278,8 +320,9 @@ static void example_espnow_task(void *pvParameter)
                     	    /* Start sending unicast ESPNOW data. */
                             memcpy(send_param->dest_mac, recv_cb->mac_addr, ESP_NOW_ETH_ALEN);
                             example_espnow_data_prepare(send_param);
+                            ESP_LOG_BUFFER_CHAR("line 324 before esp_now_send unicast?:", send_param->buffer, send_param->len);
                             if (esp_now_send(send_param->dest_mac, send_param->buffer, send_param->len) != ESP_OK) {
-                                ESP_LOGE(TAG, "Send error");
+                                ESP_LOGE(TAG, "Unicast Send error 1");
                                 example_espnow_deinit(send_param);
                                 vTaskDelete(NULL);
                             }
@@ -329,22 +372,6 @@ esp_err_t example_espnow_init(void)
     /* Set primary master key. */
     ESP_ERROR_CHECK( esp_now_set_pmk((uint8_t *)CONFIG_ESPNOW_PMK) );
 
-    /* Add broadcast peer information to peer list. */
-    esp_now_peer_info_t *peer = malloc(sizeof(esp_now_peer_info_t));
-    if (peer == NULL) {
-        ESP_LOGE(TAG, "Malloc peer information fail");
-        vSemaphoreDelete(s_example_espnow_queue);
-        esp_now_deinit();
-        return ESP_FAIL;
-    }
-    memset(peer, 0, sizeof(esp_now_peer_info_t));
-    peer->channel = CONFIG_ESPNOW_CHANNEL;
-    peer->ifidx = ESPNOW_WIFI_IF;
-    peer->encrypt = false;
-    memcpy(peer->peer_addr, s_example_broadcast_mac, ESP_NOW_ETH_ALEN);
-    ESP_ERROR_CHECK( esp_now_add_peer(peer) );
-    free(peer);
-
     /* Initialize sending parameters. */
     send_param = malloc(sizeof(example_espnow_send_param_t));
     if (send_param == NULL) {
@@ -354,14 +381,22 @@ esp_err_t example_espnow_init(void)
         return ESP_FAIL;
     }
     memset(send_param, 0, sizeof(example_espnow_send_param_t));
-    send_param->unicast = false;
-    send_param->broadcast = true;
+    send_param->unicast = true;  // Start in unicast mode
+    send_param->broadcast = false;
     send_param->state = 0;
     send_param->magic = esp_random();
     send_param->count = CONFIG_ESPNOW_SEND_COUNT;
     send_param->delay = CONFIG_ESPNOW_SEND_DELAY;
-    send_param->len = CONFIG_ESPNOW_SEND_LEN;
-    send_param->buffer = malloc(CONFIG_ESPNOW_SEND_LEN);
+
+    // Use latest SHT31 raw payload (updated by sht_queue_task)
+    send_param->payload = s_sensor_payload;
+    send_param->payload_len = sizeof(s_sensor_payload);
+
+    // Compute total frame length = header + payload
+    size_t header_len = sizeof(example_espnow_data_t);
+    send_param->len = header_len + send_param->payload_len;
+
+    send_param->buffer = malloc(send_param->len);
     if (send_param->buffer == NULL) {
         ESP_LOGE(TAG, "Malloc send buffer fail");
         free(send_param);
@@ -369,11 +404,30 @@ esp_err_t example_espnow_init(void)
         esp_now_deinit();
         return ESP_FAIL;
     }
-    memcpy(send_param->dest_mac, s_example_broadcast_mac, ESP_NOW_ETH_ALEN);
-    // Set custom payload
-    static const char my_message[] = "JOSIE message";
-    send_param->payload = (uint8_t *)my_message;
-    send_param->payload_len = sizeof(my_message) - 1; // exclude null terminator
+
+    // Set destination MAC to known peer (replace with actual peer MAC)
+    memcpy(send_param->dest_mac, s_ADAM_peer_mac, ESP_NOW_ETH_ALEN);
+
+    // Add unicast peer to peer list
+    esp_now_peer_info_t *unicast_peer = malloc(sizeof(esp_now_peer_info_t));
+    if (unicast_peer == NULL) {
+        ESP_LOGE(TAG, "Malloc unicast peer information fail");
+        free(send_param->buffer);
+        free(send_param);
+        vSemaphoreDelete(s_example_espnow_queue);
+        esp_now_deinit();
+        return ESP_FAIL;
+    }
+    memset(unicast_peer, 0, sizeof(esp_now_peer_info_t));
+    ESP_LOGI(TAG, "unicast channel: %d", CONFIG_ESPNOW_CHANNEL);
+    unicast_peer->channel = CONFIG_ESPNOW_CHANNEL;
+    unicast_peer->ifidx = ESPNOW_WIFI_IF;
+    unicast_peer->encrypt = true;
+    memcpy(unicast_peer->lmk, CONFIG_ESPNOW_LMK, ESP_NOW_KEY_LEN);
+    memcpy(unicast_peer->peer_addr, s_ADAM_peer_mac, ESP_NOW_ETH_ALEN);
+    ESP_ERROR_CHECK( esp_now_add_peer(unicast_peer) );
+    free(unicast_peer);
+
     example_espnow_data_prepare(send_param);
 
     xTaskCreate(example_espnow_task, "example_espnow_task", 2048, send_param, 4, NULL);

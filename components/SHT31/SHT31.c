@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_err.h"
+#include "unicast.h"
 
 
 static const char TAG[] = "SHT31.C";
@@ -73,15 +74,21 @@ esp_err_t SHT_READ(i2c_master_dev_handle_t dev_handle,float *temperature, float 
     // print raw values to see
     // we want to send raw values as it will be quicker...
     //
-    ESP_LOGI(TAG,"These are the raw_values: %02X %02X %02X %02X %02X %02X %02X", raw_values[0],
-         raw_values[1], raw_values[2], raw_values[3], raw_values[4], raw_values[5], raw_values[6]);
+    ESP_LOGI(TAG,"SHT31 raw_values: %02X %02X %02X %02X %02X %02X",
+         raw_values[0], raw_values[1], raw_values[2], raw_values[3], raw_values[4], raw_values[5]);
+
+    // Push raw bytes to unicast queue (T: 0,1; H: 3,4)
+    sht31_raw_sample_t s = { raw_values[0], raw_values[1], raw_values[3], raw_values[4] };
+    if (!unicast_sensor_queue_push(s)) {
+        ESP_LOGW(TAG, "Sensor queue full or not ready; dropping sample");
+    }
 
 
     
 
 
     // Convert raw values to temperature and humidity  ++ removed to tx
-    /*
+    
     uint16_t raw_temp = (raw_values[0] << 8) | raw_values[1];
     uint16_t raw_hum = (raw_values[3] << 8) | raw_values[4];
 
@@ -90,7 +97,7 @@ esp_err_t SHT_READ(i2c_master_dev_handle_t dev_handle,float *temperature, float 
 
     // Print the temperature and humidity values
     ESP_LOGI(TAG, "Temperature: %.2f °C, Humidity: %.2f %%", *temperature, *humidity);
-    */
+    
     
     return ESP_OK;
 

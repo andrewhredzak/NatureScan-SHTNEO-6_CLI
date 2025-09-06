@@ -82,6 +82,9 @@ void app_main(void){
     
 
     
+    // Initialize SHT->ESPNOW bridge queue
+    ESP_ERROR_CHECK(unicast_sensor_queue_init(10));
+
     // sht init
     i2c_master_bus_handle_t bus_handle;
     i2c_master_dev_handle_t dev_handle;
@@ -100,7 +103,7 @@ void app_main(void){
 
 
     // Probe the sensor to check if it is connected to the bus with a 10ms timeout
-    esp_err_t err = i2c_master_probe(bus_handle, SHT31_I2C_ADDR_0X44, 200);
+    esp_err_t err = i2c_master_probe(bus_handle, SHT31_I2C_ADDR_0X44, 2000);
 
     if(err == ESP_OK) {
         ESP_LOGI(TAG, "SHT31 sensor found");
@@ -138,7 +141,6 @@ void app_main(void){
     // Initialize WiFi and ESPNOW
     example_wifi_init();
     example_espnow_init();
-    // launch unicast 
     unicast_print_test();
 
 

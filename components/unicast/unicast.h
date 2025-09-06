@@ -1,5 +1,6 @@
 #include "esp_now.h"
 #include "esp_wifi.h"
+#include "esp_err.h"
 
 
 #ifndef UNICAST_H
@@ -83,6 +84,20 @@ typedef struct {
     uint8_t *payload;                     //Pointer to user payload data.
     int payload_len;                      //Length of user payload data.
 } example_espnow_send_param_t;
+
+// ---- SHT31 -> ESPNOW bridge ----
+typedef struct {
+    uint8_t t_hi;
+    uint8_t t_lo;
+    uint8_t h_hi;
+    uint8_t h_lo;
+} sht31_raw_sample_t;
+
+// Initialize the queue and a task that mirrors the latest sample into a 4-byte buffer used as ESPNOW payload
+esp_err_t unicast_sensor_queue_init(size_t depth);
+
+// Non-blocking push of one SHT31 raw sample into the queue; returns false if queue not ready or full
+bool unicast_sensor_queue_push(sht31_raw_sample_t sample);
 
 
 
