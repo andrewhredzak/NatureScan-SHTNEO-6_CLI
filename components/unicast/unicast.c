@@ -422,8 +422,8 @@ esp_err_t example_espnow_init(void)
     ESP_LOGI(TAG, "unicast channel: %d", CONFIG_ESPNOW_CHANNEL);
     unicast_peer->channel = CONFIG_ESPNOW_CHANNEL;
     unicast_peer->ifidx = ESPNOW_WIFI_IF;
-    unicast_peer->encrypt = true;
-    memcpy(unicast_peer->lmk, CONFIG_ESPNOW_LMK, ESP_NOW_KEY_LEN);
+    unicast_peer->encrypt = false;
+    memcpy(unicast_peer->lmk, CONFIG_ESPNOW_LMK, ESP_NOW_KEY_LEN); //unicast local master key
     memcpy(unicast_peer->peer_addr, s_ADAM_peer_mac, ESP_NOW_ETH_ALEN);
     ESP_ERROR_CHECK( esp_now_add_peer(unicast_peer) );
     free(unicast_peer);
