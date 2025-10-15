@@ -39,7 +39,7 @@
 #define SHT31_TASK_PRIORITY  (4)    // Medium priority
 
 
-static const char *TAG = "MAIN APP-NEO6";   // tag for main code 
+static const char *TAG = "MAIN APP-SHTNEO6_CLI";   // tag for main code 
 
 
 
@@ -88,6 +88,7 @@ void app_main(void){
     
     // Initialize SHT->ESPNOW bridge queue
     ESP_ERROR_CHECK(unicast_sensor_queue_init(10));
+    ESP_ERROR_CHECK(unicast_gprmc_queue_init(5)); // Initialize the GPS queue
 
 #if ENABLE_SHT31
     // sht init

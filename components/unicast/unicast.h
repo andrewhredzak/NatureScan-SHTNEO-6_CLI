@@ -93,6 +93,20 @@ typedef struct {
     uint8_t h_lo;
 } sht31_raw_sample_t;
 
+// ---- NEO6 GPS -> ESPNOW bridge ----
+typedef struct {
+    float latitude;
+    float longitude;
+    float speed;
+    float course;
+} gprmc_data_t;
+
+// Initialize the queue and a task that mirrors the latest GPS sample into the ESPNOW payload
+esp_err_t unicast_gprmc_queue_init(size_t depth);
+
+// Non-blocking push of one GPRMC data sample into the queue; returns false if queue not ready or full
+bool unicast_gprmc_queue_push(gprmc_data_t sample);
+
 // Initialize the queue and a task that mirrors the latest sample into a 4-byte buffer used as ESPNOW payload
 esp_err_t unicast_sensor_queue_init(size_t depth);
 

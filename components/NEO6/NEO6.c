@@ -5,6 +5,7 @@
 #include "driver/uart.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "unicast.h"
 
 static const char *TAG = "NEO6.c";  //tag for source code
 
@@ -66,30 +67,37 @@ int buffer_pos = 0;
 
 
 
-void process_nmea_sentence(char *sentence) {
+void process_nmea_sentence(char *sentence_in) {
+    char *sentence = strdup(sentence_in); // Make a copy to avoid modifying the original buffer
+    if (sentence == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for sentence processing");
+        return;
+    }
+
     // Check if the sentence starts with $GPRMC
     if (strncmp(sentence, "$GPRMC", 6) != 0) {
+        free(sentence);
         return; // Not a GPRMC sentence, skip
     }
 
     // Tokenize the sentence using comma as delimiter
     char *fields[20]; // Array to hold pointers to fields
     int field_count = 0;
-
-    fields[field_count++] = sentence; // First field starts at the beginning
-    for (char *p = sentence; *p != '\0'; p++) {
-        if (*p == ',') {
-            *p = '\0'; // Replace comma with null terminator
-            fields[field_count++] = p + 1; // Next field starts after the comma
-        }
-        if (*p == '*') break; // Stop at checksum
+    char *saveptr;
+    char *token = strtok_r(sentence, ",", &saveptr);
+    while (token != NULL && field_count < 20) {
+        fields[field_count++] = token;
+        token = strtok_r(NULL, ",", &saveptr);
     }
 
+    /*
     // Ensure we have the expected number of fields (at least 12 for GPRMC)
     if (field_count < 12) {
         printf("Incomplete GPRMC sentence\n");
+        free(sentence);
         return;
     }
+        */
 
     // Extract fields
     char *time = fields[1];        // e.g., "123519.7"
@@ -104,30 +112,56 @@ void process_nmea_sentence(char *sentence) {
     char *variation = fields[10];  // e.g., "003.1"
     char *var_dir = fields[11];    // e.g., "W"
 
+    // Basic validation: check if critical fields are empty
+    if (strlen(status) == 0 || strlen(latitude) == 0 || strlen(longitude) == 0) {
+        ESP_LOGW(TAG, "GPRMC sentence has empty critical fields, skipping.");
+        free(sentence);
+        return;
+    }
     // Convert latitude and longitude to degrees and minutes
-    float lat_deg = atoi(latitude) / 100;
-    float lat_min = (atof(latitude) - (int)lat_deg * 100);
-    lat_deg += lat_min / 60.0;
+    double lat = atof(latitude);
+    int lat_deg_int = (int)(lat / 100);
+    double lat_min_double = lat - (lat_deg_int * 100);
+    float final_lat = lat_deg_int + (lat_min_double / 60.0);
+    if (strcmp(lat_dir, "S") == 0) {
+        final_lat = -final_lat;
+    }
 
-    float lon_deg = atoi(longitude) / 100;
-    float lon_min = (atof(longitude) - (int)lon_deg * 100);
-    lon_deg += lon_min / 60.0;
+    double lon = atof(longitude);
+    int lon_deg_int = (int)(lon / 100);
+    double lon_min_double = lon - (lon_deg_int * 100);
+    float final_lon = lon_deg_int + (lon_min_double / 60.0);
+    if (strcmp(lon_dir, "W") == 0) {
+        final_lon = -final_lon;
+    }
+
+    // Populate the GPS data struct and push to queue
+    if (status[0] == 'A') {
+        gprmc_data_t gps_data = {
+            .latitude = final_lat,
+            .longitude = final_lon,
+            .speed = atof(speed),
+            .course = atof(course)
+        };
+        if (!unicast_gprmc_queue_push(gps_data)) {
+            ESP_LOGW(TAG, "GPS queue full or not ready; dropping sample");
+        }
+    }
 
     // Format time and date
     char time_str[11];
     char date_str[12];
-    snprintf(time_str, sizeof(time_str), "%c%c:%c%c:%c%c.%c",
-             time[0], time[1], time[2], time[3], time[4], time[5], time[6]);
-    snprintf(date_str, sizeof(date_str), "%c%c/%c%c/%c%c%c%c",
-             date[0], date[1], date[2], date[3], '1', '9', date[4], date[5]);
+    snprintf(time_str, sizeof(time_str), "%.2s:%.2s:%.2s", time, time + 2, time + 4);
+    snprintf(date_str, sizeof(date_str), "%.2s/%.2s/20%.2s", date, date + 2, date + 4);
 
     // Print human-readable output
     printf("Status: %s\nUTC Time: %s, Date: %s\nLatitude: %.3f° %s, Longitude: %.3f° %s\n"
            "Speed: %s knots, Course: %s°, Variation: %s° %s\n",
            status[0] == 'A' ? "Active" : "Void",time_str,date_str,  
-           lat_deg, lat_dir, lon_deg, lon_dir,
+           final_lat, lat_dir, final_lon, lon_dir,
            speed, course, variation, var_dir);
     printf("\n");
+    free(sentence);
 }
 
 
@@ -152,7 +186,8 @@ void gps_task(uart_port_t uart_num) {
 
                 // Check for end of NMEA sentence (\r\n)
                 if (buffer_pos >= 2 && uart_buffer[buffer_pos - 2] == '\r' && uart_buffer[buffer_pos - 1] == '\n') {
-                    uart_buffer[buffer_pos] = '\0'; // Null-terminate the string
+                    // Temporarily null-terminate before the \r\n
+                    uart_buffer[buffer_pos - 2] = '\0';
                     process_nmea_sentence(uart_buffer);
                     buffer_pos = 0; // Reset buffer position
                     }

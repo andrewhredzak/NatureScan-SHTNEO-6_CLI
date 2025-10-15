@@ -38,16 +38,19 @@ QueueHandle_t s_example_espnow_queue;
 
 // ---- SHT31 -> ESPNOW bridge ----
 static QueueHandle_t s_sht_queue = NULL;
-static uint8_t s_sensor_payload[4] = {0};  // {T_hi, T_lo, H_hi, H_lo}
+
+// ---- GPS -> ESPNOW bridge ----
+static QueueHandle_t s_gprmc_queue = NULL;
+
+// ---- Combined Payload ----
+static uint8_t s_combined_payload[sizeof(sht31_raw_sample_t) + sizeof(gprmc_data_t)] = {0};
 
 static void sht_queue_task(void *arg) {
     sht31_raw_sample_t s;
     while (1) {
         if (xQueueReceive(s_sht_queue, &s, portMAX_DELAY) == pdTRUE) {
-            s_sensor_payload[0] = s.t_hi;
-            s_sensor_payload[1] = s.t_lo;
-            s_sensor_payload[2] = s.h_hi;
-            s_sensor_payload[3] = s.h_lo;
+            // Copy SHT31 data into the first part of the combined payload
+            memcpy(s_combined_payload, &s, sizeof(sht31_raw_sample_t));
         }
     }
 }
@@ -72,6 +75,38 @@ bool unicast_sensor_queue_push(sht31_raw_sample_t sample) {
     if (!s_sht_queue) return false;
     return xQueueSend(s_sht_queue, &sample, 0) == pdTRUE;
 }
+
+static void gprmc_queue_task(void *arg) {
+    gprmc_data_t gps_data;
+    while (1) {
+        if (xQueueReceive(s_gprmc_queue, &gps_data, portMAX_DELAY) == pdTRUE) {
+            // Copy GPS data into the second part of the combined payload, after SHT31 data
+            memcpy(s_combined_payload + sizeof(sht31_raw_sample_t), &gps_data, sizeof(gprmc_data_t));
+        }
+    }
+}
+
+esp_err_t unicast_gprmc_queue_init(size_t depth) {
+    if (s_gprmc_queue) return ESP_OK;
+    s_gprmc_queue = xQueueCreate(depth, sizeof(gprmc_data_t));
+    if (!s_gprmc_queue) {
+        ESP_LOGE(TAG, "Failed to create GPRMC queue");
+        return ESP_FAIL;
+    }
+    if (xTaskCreate(gprmc_queue_task, "gprmc_queue_task", 2048, NULL, 4, NULL) != pdPASS) {
+        vQueueDelete(s_gprmc_queue);
+        s_gprmc_queue = NULL;
+        ESP_LOGE(TAG, "Failed to create gprmc_queue_task");
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
+bool unicast_gprmc_queue_push(gprmc_data_t sample) {
+    if (!s_gprmc_queue) return false;
+    return xQueueSend(s_gprmc_queue, &sample, 0) == pdTRUE;
+}
+
 
 
 void unicast_print_test() {
@@ -398,9 +433,9 @@ esp_err_t example_espnow_init(void)
     send_param->count = CONFIG_ESPNOW_SEND_COUNT;
     send_param->delay = CONFIG_ESPNOW_SEND_DELAY;
 
-    // Use latest SHT31 raw payload (updated by sht_queue_task)
-    send_param->payload = s_sensor_payload;
-    send_param->payload_len = sizeof(s_sensor_payload);
+    // Use the combined payload buffer
+    send_param->payload = s_combined_payload;
+    send_param->payload_len = sizeof(s_combined_payload);
 
     // Compute total frame length = header + payload
     size_t header_len = sizeof(example_espnow_data_t);
@@ -452,4 +487,3 @@ static void example_espnow_deinit(example_espnow_send_param_t *send_param)
     vSemaphoreDelete(s_example_espnow_queue);
     esp_now_deinit();
 }
-
