@@ -28,6 +28,10 @@
 #include "esp_crc.h"
 #include "unicast.h"
 
+// Feature toggles
+#define ENABLE_SHT31   1   // Set to 0 to disable SHT31 sampling
+#define ENABLE_NEO6    1   // Set to 0 to disable NEO6 GPS
+
 
 
 #define GPS_TASK_STACK_SIZE (4096)  // Increased stack size
@@ -85,6 +89,7 @@ void app_main(void){
     // Initialize SHT->ESPNOW bridge queue
     ESP_ERROR_CHECK(unicast_sensor_queue_init(10));
 
+#if ENABLE_SHT31
     // sht init
     i2c_master_bus_handle_t bus_handle;
     i2c_master_dev_handle_t dev_handle;
@@ -120,22 +125,19 @@ void app_main(void){
         ESP_ERROR_CHECK(i2c_del_master_bus(bus_handle));
         ESP_LOGI(TAG, "I2C de-initialized successfully");
     }
+#endif // ENABLE_SHT31
 
     
 
 
-    /*
-    
-
-
+    #if ENABLE_NEO6
     // UART initialization for NEO-6
     const uart_port_t uart_num = UART_NUM;
     uart_init(uart_num);
 
     // launch NEO-6 GPS task
     xTaskCreate(gps_task,"gps_task",GPS_TASK_STACK_SIZE,(void*)UART_NUM,GPS_TASK_PRIORITY,NULL);
-
-    */
+#endif // ENABLE_NEO6
 
 
     // Initialize WiFi and ESPNOW
