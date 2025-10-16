@@ -9,6 +9,10 @@
 
 static const char *TAG = "NEO6.c";  //tag for source code
 
+char uart_buffer[RX_BUFFER_SIZE];
+int buffer_pos = 0;
+
+
 void uart_init(uart_port_t uart_num) {
     /* **brief this function initializes UART configuration parameters.
         Key configuration constants (e.g., data bits, parity) are provided by uart.h,
@@ -57,12 +61,6 @@ void gps_event_handler(uint8_t *data, uint16_t len) {
     // Log the raw NMEA sentence to console (UART1)
     //ESP_LOGI(TAG, "GPS Data: %s", (char *)data);
 }
-
-
-
-char uart_buffer[RX_BUFFER_SIZE];
-int buffer_pos = 0;
-
 
 
 
@@ -155,12 +153,14 @@ void process_nmea_sentence(char *sentence_in) {
     snprintf(date_str, sizeof(date_str), "%.2s/%.2s/20%.2s", date, date + 2, date + 4);
 
     // Print human-readable output
+    /*
     printf("Status: %s\nUTC Time: %s, Date: %s\nLatitude: %.3f° %s, Longitude: %.3f° %s\n"
            "Speed: %s knots, Course: %s°, Variation: %s° %s\n",
            status[0] == 'A' ? "Active" : "Void",time_str,date_str,  
            final_lat, lat_dir, final_lon, lon_dir,
            speed, course, variation, var_dir);
     printf("\n");
+    */
     free(sentence);
 }
 

@@ -37,10 +37,10 @@ uint16_t s_example_espnow_seq[EXAMPLE_ESPNOW_DATA_MAX] = { 0, 0 };
 QueueHandle_t s_example_espnow_queue;
 
 // ---- SHT31 -> ESPNOW bridge ----
-static QueueHandle_t s_sht_queue = NULL;
+static QueueHandle_t s_sht_queue = NULL; //declare SHT31 queue
 
 // ---- GPS -> ESPNOW bridge ----
-static QueueHandle_t s_gprmc_queue = NULL;
+static QueueHandle_t s_gprmc_queue = NULL;  //declare the GPS queue
 
 // ---- Combined Payload ----
 static uint8_t s_combined_payload[sizeof(sht31_raw_sample_t) + sizeof(gprmc_data_t)] = {0};
@@ -81,7 +81,10 @@ static void gprmc_queue_task(void *arg) {
     while (1) {
         if (xQueueReceive(s_gprmc_queue, &gps_data, portMAX_DELAY) == pdTRUE) {
             // Copy GPS data into the second part of the combined payload, after SHT31 data
+            ESP_LOGI(TAG, "gpsprint unloading s_gprmc_queue: Lat %.6f, Lon %.6f, Speed %.2f, Course %.2f",
+                 gps_data.latitude, gps_data.longitude, gps_data.speed, gps_data.course);
             memcpy(s_combined_payload + sizeof(sht31_raw_sample_t), &gps_data, sizeof(gprmc_data_t));
+            ESP_LOG_BUFFER_HEX("Combined Payload:", s_combined_payload, sizeof(s_combined_payload));
         }
     }
 }
